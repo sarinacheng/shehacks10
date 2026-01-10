@@ -1,22 +1,44 @@
 from camera.webcam import Webcam
 from tracking.hand_tracker import HandTracker
 
+from gestures.pinch import PinchDetector
+from input.mouse_controller import MouseController
+from input.event_loop import EventLoop
+
 def main():
-    cam = Webcam(index=0, window_name="Hover Screen")
-    tracker = HandTracker(max_num_hands=2)
+    cam = Webcam(index=0, window_name="Hand Tracker")
+    tracker = HandTracker(max_num_hands=1)
 
-    while True:
-        frame = cam.read()
-        if frame is None:
-            break
+    pinch = PinchDetector(
+        pinch_threshold=0.045,
+        release_threshold=0.060,
+        cooldown_s=0.20,
+    )
 
-        results = tracker.process(frame)
-        tracker.draw(frame, results)
+    mouse = MouseController()
+    events = EventLoop(mouse)
+    events.start()
 
-        if cam.show(frame):  # returns True if user pressed ESC/Q
-            break
+    try:
+        while True:
+            frame = cam.read()
+            if frame is None:
+                break
 
-    cam.release()
+            results = tracker.process(frame)
+            tracker.draw(frame, results)
+
+            # Emit events (option B)
+            if results.multi_hand_landmarks:
+                hand = results.multi_hand_landmarks[0]
+                for ev in pinch.update(hand):
+                    events.emit(ev)
+
+            if cam.show(frame):
+                break
+    finally:
+        events.stop()
+        cam.release()
 
 if __name__ == "__main__":
     main()
