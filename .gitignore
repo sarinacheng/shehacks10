@@ -3,6 +3,7 @@ node_modules/
 vendor/
 .pnp/
 .pnp.js
+venv/
 
 # Build outputs
 dist/
@@ -41,5 +42,3 @@ coverage/
 *.tmp
 *.temp
 .cache/
-
-venv/
