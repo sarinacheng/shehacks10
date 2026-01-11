@@ -99,11 +99,11 @@ def main():
                 hand = results.multi_hand_landmarks[0]
                 # DEBUG: Process hand
                 if args.hid:
-                     print("Hand detected!")
+                     pass # print("Hand detected!")
 
                 # cursor move every frame
                 x, y = cursor.update(hand)
-                print(f"DEBUG Main: emitting MOVE {x}, {y}")
+                # print(f"DEBUG Main: emitting MOVE {x}, {y}")
                 events.emit(("MOVE", x, y))
 
                 # pinch click events

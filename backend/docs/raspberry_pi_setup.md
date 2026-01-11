@@ -238,10 +238,13 @@ If `apt install python3.11` fails (common on newer OS versions), use **Miniforge
     ```
 
 4.  **Install Requirements (Project Directory)**:
-    *(Note: Mamba replaces `venv`. Ensure you see `(hover)` in your prompt)*
-    ```bash
     mamba activate hover
     cd ~/shehacks10/backend
+    # Install PyBluez dependencies
+    sudo apt install -y libbluetooth-dev git
+    # Install PyBluez from source (pip version is broken on Python 3.11+)
+    pip install git+https://github.com/pybluez/pybluez.git#egg=pybluez
+    
     mamba install -y dbus-python pygobject
     pip install -r requirements.txt
     ```

@@ -110,7 +110,33 @@ class HIDController:
         self.send_report(report)
 
     def screenshot(self):
-        # Keyboard Report ID 0x02 (if we had one, but we used Mouse descriptor above)
-        # Implementing keyboard is tricky without a complex descriptor.
-        # For now, let's just print that we can't do screenshots easily via raw HID yet
-        print("Screenshot not fully implemented in bare-socket HID yet.")
+        # Keyboard Report (ID 0x01 is mouse, usually 0x02 is keyboard if defined, 
+        # but in simplified boot protocol or composite, it might vary).
+        # Standard Boot Keyboard Report: [Modifier, Reserved, Key1, Key2, Key3, Key4, Key5, Key6]
+        # Modifiers: LeftGUI (0x08) + LeftShift (0x02) = 0x0A
+        # Key: '3' -> Keycode 0x20
+        
+        # NOTE: Without a full SDP Report Descriptor handshake, the Mac relies on the Class of Device (0x5C0).
+        # If it treats us as a Composite device, we usually need Report IDs.
+        # Let's try sending a standard Report ID 2 for Keyboard.
+        
+        print("Triggering Screenshot (Cmd+Shift+3)...")
+        
+        # Press: Report ID 2, Modifier 0x0A (Cmd+Shift), Reserved 0, Key 0x20 (3)
+        # Structure: ID (1 byte) + Modifier (1 byte) + Reserved (1 byte) + Key (1 byte) + padding...
+        # Actually standard report is: [Modifier, Reserved, Key1, Key2...]
+        # Wrapped in L2CAP DATA frame (0xA1) + ReportID (0x02)
+        
+        # Cmd(8) + Shift(2) = 10
+        # Key '3' = 32 (0x20)
+        
+        # Press
+        # Report ID 2
+        payload = struct.pack('BBBB', 0x02, 0x0A, 0x00, 0x20) + b'\x00'*5
+        self.send_report(payload)
+        
+        time.sleep(0.05)
+        
+        # Release (All zeros)
+        payload = struct.pack('BBBB', 0x02, 0x00, 0x00, 0x00) + b'\x00'*5
+        self.send_report(payload)
