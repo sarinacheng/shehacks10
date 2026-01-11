@@ -4,6 +4,7 @@ import time
 import cv2
 import numpy as np
 import threading
+import asyncio
 
 from camera.webcam import Webcam
 from tracking.hand_tracker import HandTracker
@@ -18,6 +19,8 @@ from input.mouse_controller import MouseController
 from input.event_loop import EventLoop
 
 from Quartz import CGDisplayBounds, CGMainDisplayID
+
+from client.net_bridge import NetBridge
 
 try:
     from AppKit import (
@@ -55,7 +58,6 @@ def main():
     )
 
     frame_detector = FrameDetector()
-    copy_paste = CopyPasteGestureHandler()
 
     scroll = ScrollDetector(
         finger_raise_threshold=0.015,
@@ -81,6 +83,18 @@ def main():
         gain=2.2,
         smoothing=0.15,
         offset_px=(5, 0)
+    )
+
+    # Start network bridge
+    uri = "wss://<your-repl>.replit.dev"
+    session_id = "team1"
+    name = "LaptopA"  # change per laptop
+    net = NetBridge(uri, session_id, name)
+    asyncio.get_event_loop().create_task(net.run())
+
+    copy_paste = CopyPasteGestureHandler(
+        on_copy=lambda: asyncio.get_event_loop().create_task(net.send_clipboard()),
+        on_paste=lambda: mouse.paste()  # or write_clipboard_text(...) then paste if needed
     )
 
     try:

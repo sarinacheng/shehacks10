@@ -171,11 +171,10 @@ class CopyPasteGestureHandler:
 
     def _trigger_action(self, gesture: str) -> None:
         if gesture == "copy":
-            print("COPY GESTURE CONFIRMED 🤌")
             if self.on_copy:
                 self.on_copy()
-
+            print("COPY triggered")
         elif gesture == "paste":
-            print("PASTE GESTURE CONFIRMED ✋")
             if self.on_paste:
                 self.on_paste()
+            print("PASTE triggered")
