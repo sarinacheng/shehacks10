@@ -1,11 +1,14 @@
 from pynput.mouse import Controller, Button
+from pynput.keyboard import Controller as KeyboardController, Key
 from PIL import ImageGrab
 import os
 import datetime
+import time
 
 class MouseController:
     def __init__(self):
         self.mouse = Controller()
+        self.keyboard = KeyboardController()
         self.screen_w, self.screen_h = self._get_screen_size()
         self._left_down = False  # 👈 IMPORTANT STATE
 
@@ -32,29 +35,26 @@ class MouseController:
         self.mouse.click(Button.left, 1)
 
     def screenshot(self):
-        # Create screenshots directory if it doesn't exist
-        save_dir = os.path.expanduser("~/Desktop/Screenshots") # Or current dir
-        if not os.path.exists(save_dir):
-            try:
-                os.makedirs(save_dir)
-            except OSError:
-                save_dir = "." # Fallback to current directory
-        
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = os.path.join(save_dir, f"screenshot_{timestamp}.png")
-        
+        """Trigger macOS Command+Shift+3 screenshot shortcut"""
+        print("MouseController: Triggering Command+Shift+3 screenshot...")
         try:
-            im = ImageGrab.grab()
-            im.save(filename)
-            print(f"Screenshot saved to {filename}")
+            # Press Command+Shift+3 (macOS full screen screenshot)
+            # Hold all keys, then release
+            self.keyboard.press(Key.cmd)
+            self.keyboard.press(Key.shift)
+            self.keyboard.press('3')
+            time.sleep(0.05)  # Brief delay to ensure keys are pressed
+            self.keyboard.release('3')
+            self.keyboard.release(Key.shift)
+            self.keyboard.release(Key.cmd)
+            print("✓ Command+Shift+3 triggered successfully")
+            return True
         except Exception as e:
-            print(f"Failed to take screenshot: {e}")
+            print(f"✗ Failed to trigger screenshot shortcut: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
 
-    # def move_to(self, x, y):
-    #     self.mouse.position = (x, y)
-
-    def press(self):
-        self.mouse.press(Button.left)
-
-    def release(self):
-        self.mouse.release(Button.left)
+    def scroll(self, dx, dy):
+        """Scroll the mouse wheel. dy: positive = scroll down, negative = scroll up"""
+        self.mouse.scroll(dx, dy)

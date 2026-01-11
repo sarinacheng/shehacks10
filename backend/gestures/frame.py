@@ -19,6 +19,7 @@ class FrameDetector:
         
         self._pose_start_time = None
         self._last_trigger_time = 0.0
+        self._last_debug_time = 0.0
 
     def update(self, results):
         """
@@ -66,17 +67,34 @@ class FrameDetector:
             return events
 
         # Check poses
-        if self._is_left_hand_pose(left_hand_lms) and self._is_right_hand_pose(right_hand_lms):
+        left_pose = self._is_left_hand_pose(left_hand_lms)
+        right_pose = self._is_right_hand_pose(right_hand_lms)
+        
+        # Debug output to help diagnose detection issues (only print occasionally)
+        if (not left_pose or not right_pose) and (now - self._last_debug_time > 2.0):
+            if not left_pose:
+                print("⚠ Left hand pose not detected - need: thumb UP, index RIGHT")
+            if not right_pose:
+                print("⚠ Right hand pose not detected - need: thumb DOWN, index LEFT")
+            self._last_debug_time = now
+        
+        if left_pose and right_pose:
              # Check relative positions if needed (Right hand above/right of Left hand)
              # but individual poses might be unique enough.
              
              if self._pose_start_time is None:
                  self._pose_start_time = now
-             elif (now - self._pose_start_time) > self.activation_time:
-                 events.append("SCREENSHOT")
-                 self._last_trigger_time = now
-                 self._pose_start_time = None
+                 print("✓ Frame gesture detected! Hold for 1 second to take screenshot...")
+             else:
+                 elapsed = now - self._pose_start_time
+                 if elapsed > self.activation_time:
+                     events.append("SCREENSHOT")
+                     print("📸 SCREENSHOT event triggered!")
+                     self._last_trigger_time = now
+                     self._pose_start_time = None
         else:
+            if self._pose_start_time is not None:
+                print("✗ Frame gesture lost - resetting")
             self._pose_start_time = None
 
         return events
@@ -91,14 +109,14 @@ class FrameDetector:
         
         l = lms.landmark
         
-        # Check Thumb UP: Tip y < IP y < MCP y
-        thumb_up = (l[4].y < l[3].y < l[2].y)
+        # Check Thumb UP: Tip y should be significantly above IP and MCP
+        # Use threshold for more lenient detection
+        thumb_up = (l[4].y < l[3].y - 0.01) and (l[3].y < l[2].y - 0.01)
         
-        # Check Index RIGHT: Tip x > PIP x > MCP x 
-        # (Note: x increases to the right)
-        index_right = (l[8].x > l[6].x > l[5].x)
+        # Check Index RIGHT: Tip x should be to the right of PIP and MCP
+        # (Note: x increases to the right, y increases downward)
+        index_right = (l[8].x > l[6].x + 0.01) and (l[6].x > l[5].x + 0.01)
         
-        # Ideally other fingers curled, but let's stick to core definition first.
         return thumb_up and index_right
 
     def _is_right_hand_pose(self, lms):
@@ -107,10 +125,10 @@ class FrameDetector:
         """
         l = lms.landmark
         
-        # Check Thumb DOWN: Tip y > IP y > MCP y
-        thumb_down = (l[4].y > l[3].y > l[2].y)
+        # Check Thumb DOWN: Tip y should be significantly below IP and MCP
+        thumb_down = (l[4].y > l[3].y + 0.01) and (l[3].y > l[2].y + 0.01)
         
-        # Check Index LEFT: Tip x < PIP x < MCP x
-        index_left = (l[8].x < l[6].x < l[5].x)
+        # Check Index LEFT: Tip x should be to the left of PIP and MCP
+        index_left = (l[8].x < l[6].x - 0.01) and (l[6].x < l[5].x - 0.01)
         
         return thumb_down and index_left
