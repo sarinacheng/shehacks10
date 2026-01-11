@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import threading
 import subprocess
+import asyncio
 
 from camera.webcam import Webcam
 from tracking.hand_tracker import HandTracker
@@ -22,6 +23,8 @@ from input.mouse_controller import MouseController
 from input.event_loop import EventLoop
 
 from Quartz import CGDisplayBounds, CGMainDisplayID
+
+from client.net_bridge import NetBridge
 
 try:
     from AppKit import (
@@ -78,7 +81,7 @@ def main():
     pinch = PinchDetector(
         pinch_threshold=0.045,  # More sensitive - easier to trigger
         release_threshold=0.065,  # More forgiving release
-        hold_delay_s=0.08  # Faster click response
+        hold_delay_s=0.25  # Faster click response
     )
 
     frame_detector = FrameDetector()
@@ -116,6 +119,28 @@ def main():
     # ---------- Feature Control ----------
     features_enabled = True  # Start with features enabled
     print("[INFO] Hand gesture features ENABLED. Raise both palms to disable, make semi-circles with both hands to resume.")
+
+    # Start network bridge
+    uri = "wss://c6696aad-54be-4a56-8d33-096dd3ccfbf5-00-j4ckoakwrx74.worf.replit.dev"
+    session_id = "team1"
+    name = "LaptopA"  # change per laptop
+
+    net = NetBridge(uri, session_id, name)
+
+    net_loop = asyncio.new_event_loop()
+    threading.Thread(target=net_loop.run_forever, daemon=True).start()
+    net_loop.call_soon_threadsafe(net_loop.create_task, net.run())
+
+    copy_paste = CopyPasteGestureHandler(
+        on_copy=lambda: (
+            mouse.copy(),  # perform Cmd+C locally
+            net_loop.call_soon_threadsafe(
+                net_loop.create_task,
+                net.send_clipboard_after_copy(0.2)  # send after clipboard updates
+            )
+        ),
+        on_paste=lambda: mouse.paste(),
+    )
 
     try:
         while True:

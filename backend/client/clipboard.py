@@ -10,5 +10,3 @@ def read_clipboard_text() -> str:
 def write_clipboard_text(text: str) -> None:
     """macOS: write clipboard via pbcopy."""
     subprocess.run(["pbcopy"], input=text, text=True, check=True)
-
-
