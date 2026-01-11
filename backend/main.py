@@ -84,10 +84,10 @@ def main():
     stop_resume = StopResumeDetector()
 
     scroll = ScrollDetector(
-        finger_raise_threshold=0.015,
-        min_scroll_delta=0.0005,
-        scroll_sensitivity=100.0,
-        finger_distance_threshold=0.04  # ← tighter = fingers must be closer
+        finger_raise_threshold=0.005,  # More lenient - works with fingers side by side
+        min_scroll_delta=0.0003,       # More responsive
+        scroll_sensitivity=150.0,      # Increased sensitivity
+        finger_distance_threshold=0.08  # More lenient - fingers can be slightly apart
     )
 
     # ---------- Mouse + Event Loop ----------
