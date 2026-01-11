@@ -81,7 +81,7 @@ def main():
     pinch = PinchDetector(
         pinch_threshold=0.045,  # More sensitive - easier to trigger
         release_threshold=0.065,  # More forgiving release
-        hold_delay_s=0.08  # Faster click response
+        hold_delay_s=0.25  # Faster click response
     )
 
     frame_detector = FrameDetector()

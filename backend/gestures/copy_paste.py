@@ -18,6 +18,7 @@
 import time
 import math
 import subprocess
+import pyautogui
 from typing import Optional, Callable
 
 # MediaPipe landmark indices
@@ -195,7 +196,11 @@ class CopyPasteGestureHandler:
     def _trigger_action(self, gesture: str) -> None:
         if gesture == "copy":
             pyautogui.hotkey("command", "c")
+            if self.on_copy:
+                self.on_copy()   # this lets main.py push to the server
+            print("COPY triggered")
             self._show_notification("Copied!", "Copied!")
+
         elif gesture == "paste":
             if self.on_paste:
                 self.on_paste()
