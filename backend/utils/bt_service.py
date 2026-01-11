@@ -1,4 +1,9 @@
 
+import os
+# Force DBus to look at the system socket, not the conda environment's imaginary one
+if "DBUS_SYSTEM_BUS_ADDRESS" not in os.environ:
+    os.environ["DBUS_SYSTEM_BUS_ADDRESS"] = "unix:path=/var/run/dbus/system_bus_socket"
+
 import dbus
 import dbus.service
 import dbus.mainloop.glib

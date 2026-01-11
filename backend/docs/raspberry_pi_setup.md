@@ -242,7 +242,7 @@ If `apt install python3.11` fails (common on newer OS versions), use **Miniforge
     ```bash
     mamba activate hover
     cd ~/shehacks10/backend
-    mamba install -y dbus-python
+    mamba install -y dbus-python pygobject
     pip install -r requirements.txt
     ```
 
@@ -260,5 +260,47 @@ If `apt install python3.11` fails (common on newer OS versions), use **Miniforge
 
 ### "externally-managed-environment" Error
 - Ensure you are using the venv: `source venv/bin/activate`.
-- Use the detailed path: `./venv/bin/pip install ...`
-- If all else fails, the `--break-system-packages` flag works, but only if you have internet!
+### "Temporary failure in name resolution" (The "Nuclear" Fix)
+If you keep seeing this error, your DNS or System Time is broken. Run these commands strictly in order:
+
+1.  **Force DNS to Google (and lock it)**:
+    ```bash
+    echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
+    sudo chattr +i /etc/resolv.conf  # Prevents OS from overwriting it
+    ```
+
+2.  **Force System Time Update**:
+    (SSL fails if time is wrong. Replace with current date/time!)
+    ```bash
+    sudo date -s "2025-01-11 12:00:00"
+    ```
+
+3.  **Test Connection**:
+    ```bash
+    ping -c 3 google.com
+    ```
+    *Only proceed if you see "64 bytes from..."*
+
+4.  **Retry Install**:
+    ```bash
+    mamba install -y pygobject
+    ```
+
+### "Dependency 'girepository-2.0' is required"
+This means you are trying to build `PyGObject` from source but are missing the system headers.
+
+1.  **Install Headers**:
+    ```bash
+    sudo apt install -y libcairo2-dev libgirepository1.0-dev pkg-config python3-dev
+    ```
+
+2.  **Ensure you are in the hover environment**:
+    Check your prompt. It should say `(hover)`, not `(base)`.
+    ```bash
+    mamba activate hover
+    ```
+
+3.  **Install**:
+    ```bash
+    pip install PyGObject
+    ```

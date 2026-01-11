@@ -4,6 +4,15 @@ import struct
 import time
 import threading
 
+# Fallback for systems (like Conda) where socket.AF_BLUETOOTH is missing
+USE_PYBLUEZ = not hasattr(socket, 'AF_BLUETOOTH')
+if USE_PYBLUEZ:
+    try:
+        import bluetooth
+    except ImportError:
+        print("Error: socket.AF_BLUETOOTH missing and 'pybluez' not installed.")
+        USE_PYBLUEZ = False # Will crash later, but at least we warned
+
 class HIDController:
     def __init__(self, width=1920, height=1080):
         self.sock_control = None
@@ -23,17 +32,30 @@ class HIDController:
     def _listen(self):
         print("HIDController: Waiting for Bluetooth connection on (L2CAP 17/19)...")
         try:
-            # L2CAP Control (Port 17)
-            self.sock_control = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_L2CAP)
-            self.sock_control.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.sock_control.bind((socket.BDADDR_ANY, 17))
-            self.sock_control.listen(1)
+            if USE_PYBLUEZ:
+                print("HIDController: Using PyBluez (socket.AF_BLUETOOTH missing)")
+                # L2CAP Control (Port 17)
+                self.sock_control = bluetooth.BluetoothSocket(bluetooth.L2CAP)
+                self.sock_control.setblocking(True)
+                self.sock_control.bind(("", 17))
+                self.sock_control.listen(1)
 
-            # L2CAP Interrupt (Port 19)
-            self.sock_interrupt = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_L2CAP)
-            self.sock_interrupt.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.sock_interrupt.bind((socket.BDADDR_ANY, 19))
-            self.sock_interrupt.listen(1)
+                # L2CAP Interrupt (Port 19)
+                self.sock_interrupt = bluetooth.BluetoothSocket(bluetooth.L2CAP)
+                self.sock_interrupt.setblocking(True)
+                self.sock_interrupt.bind(("", 19))
+                self.sock_interrupt.listen(1)
+            else:
+                # Native Python Socket
+                self.sock_control = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_L2CAP)
+                self.sock_control.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self.sock_control.bind((socket.BDADDR_ANY, 17))
+                self.sock_control.listen(1)
+
+                self.sock_interrupt = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_L2CAP)
+                self.sock_interrupt.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self.sock_interrupt.bind((socket.BDADDR_ANY, 19))
+                self.sock_interrupt.listen(1)
 
             # Accept control first
             self.client_control, addr = self.sock_control.accept()
