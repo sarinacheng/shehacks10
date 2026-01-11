@@ -20,7 +20,6 @@ class MouseController:
     def move_to(self, x, y):
         self.mouse.position = (int(x), int(y))
 
-    # ---------- CLICK / HOLD ----------
     def left_down(self):
         if not self._left_down:
             self.mouse.press(Button.left)

@@ -18,11 +18,12 @@ class PinchDetector:
       - "PINCH_START"  → long pinch (drag start)
       - "PINCH_END"    → drag end
     """
+
     def __init__(
         self,
-        pinch_threshold=0.025,
-        release_threshold=0.025,
-        hold_delay_s=0.25   # 👈 controls click vs select
+        pinch_threshold=0.030,
+        release_threshold=0.040,
+        hold_delay_s=0.25
     ):
         self.pinch_threshold = pinch_threshold
         self.release_threshold = release_threshold
@@ -31,18 +32,21 @@ class PinchDetector:
         self._pinch_start_t = None
         self._dragging = False
 
+    def is_active(self):
+        """True while drag-select is active"""
+        return self._dragging
+
     def update(self, hand_landmarks):
         events = []
         lms = hand_landmarks.landmark
         d = _dist3(lms[THUMB_TIP], lms[INDEX_TIP])
         now = time.time()
 
-        # ---------- PINCH DETECTED ----------
+        # ----- PINCH -----
         if d < self.pinch_threshold:
             if self._pinch_start_t is None:
                 self._pinch_start_t = now
 
-            # Held long enough → start drag
             if (
                 not self._dragging
                 and (now - self._pinch_start_t) >= self.hold_delay_s
@@ -50,15 +54,14 @@ class PinchDetector:
                 self._dragging = True
                 events.append("PINCH_START")
 
-        # ---------- RELEASE ----------
-        else:
+        # ----- RELEASE -----
+        elif d > self.release_threshold:
             if self._pinch_start_t is not None:
                 if self._dragging:
                     events.append("PINCH_END")
-                else:
+                elif (now - self._pinch_start_t) > 0.05:
                     events.append("CLICK")
 
-            # reset state
             self._pinch_start_t = None
             self._dragging = False
 

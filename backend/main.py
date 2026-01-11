@@ -10,8 +10,9 @@ from tracking.hand_tracker import HandTracker
 from gestures.pinch import PinchDetector
 from gestures.scroll import ScrollDetector
 from gestures.cursor import CursorMapper
-
+from gestures.copy_paste import CopyPasteDetector
 from gestures.frame import FrameDetector
+
 from input.mouse_controller import MouseController
 from input.event_loop import EventLoop
 
@@ -373,16 +374,16 @@ def show_screenshot_preview(image, filename):
 
 
 def main():
+    # ---------- Camera & Tracking ----------
     cam = Webcam(index=0, window_name="Hand Tracker")
     tracker = HandTracker(max_num_hands=2)
 
-    frame_detector = FrameDetector()
-
+    # ---------- Gesture Detectors ----------
     pinch = PinchDetector(
-        pinch_threshold=0.045,
-        release_threshold=0.060,
+        pinch_threshold=0.030,
+        release_threshold=0.040,
         hold_delay_s=0.25
-    )   
+    )
 
 
     scroll = ScrollDetector(
@@ -391,24 +392,24 @@ def main():
         scroll_sensitivity=100.0  # High sensitivity: small hand movement = large page scroll
     )
 
-    # Mouse controller + event loop (runs OS input on separate thread)
+    # ---------- Mouse + Event Loop ----------
     mouse = MouseController()
     # No need for screenshot preview callback since macOS handles it
     events = EventLoop(mouse, screenshot_preview_callback=None)
     events.start()
 
-    # Use macOS Quartz for real screen size (prevents "invisible wall")
+    # ---------- Screen Size ----------
     screen_w, screen_h = get_screen_size()
     print("screen:", screen_w, screen_h)
 
-    # Cursor mapping (tune these)
+    # ---------- Cursor Mapping ----------
     cursor = CursorMapper(
         screen_w, screen_h,
         roi_x_min=0.05, roi_x_max=0.95,
         roi_y_min=0.10, roi_y_max=0.90,
         gain=2.2,
         smoothing=0.15,
-        offset_px=(5, 0)   # cursor appears slightly beside fingertip
+        offset_px=(5, 0)
     )
 
     try:
@@ -421,7 +422,6 @@ def main():
             tracker.draw(frame, results)
 
             if results.multi_hand_landmarks:
-                # 1. Pinch Detection (using first detected hand)
                 hand = results.multi_hand_landmarks[0]
 
                 # Check for scroll events first to update scrolling state
@@ -442,7 +442,7 @@ def main():
                     print(f"Scroll event: {ev}")  # Debug output
                     events.emit(ev)
 
-                # 2. Frame Gesture Detection (passing all results)
+                # ---------- FRAME GESTURES ----------
                 for ev in frame_detector.update(results):
                     if ev == "SCREENSHOT":
                         print(f"Main: Emitting SCREENSHOT event")
@@ -450,6 +450,9 @@ def main():
 
             if cam.show(frame):
                 break
+
+    except KeyboardInterrupt:
+        print("\n[INFO] Shutting down hover mouse...")
 
     finally:
         events.stop()
