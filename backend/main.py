@@ -4,12 +4,9 @@ from camera.webcam import Webcam
 from tracking.hand_tracker import HandTracker
 
 from gestures.pinch import PinchDetector
-<<<<<<< Updated upstream
 from gestures.cursor import CursorMapper
 
-=======
 from gestures.frame import FrameDetector
->>>>>>> Stashed changes
 from input.mouse_controller import MouseController
 from input.event_loop import EventLoop
 
