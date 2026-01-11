@@ -30,7 +30,7 @@ class SwipeDetector:
         self,
         finger_together_threshold=0.06,  # Max distance between adjacent fingertips (lenient - just needs to be closer than paste)
         min_swipe_distance=0.02,  # Minimum movement distance to trigger swipe (more sensitive)
-        hold_time=0.15  # Time to hold gesture before recognizing swipe (faster)
+        hold_time=2.0  # Time to hold gesture before recognizing swipe (2 seconds)
     ):
         self.finger_together_threshold = finger_together_threshold
         self.min_swipe_distance = min_swipe_distance
