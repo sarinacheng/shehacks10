@@ -4,8 +4,12 @@ from camera.webcam import Webcam
 from tracking.hand_tracker import HandTracker
 
 from gestures.pinch import PinchDetector
+<<<<<<< Updated upstream
 from gestures.cursor import CursorMapper
 
+=======
+from gestures.frame import FrameDetector
+>>>>>>> Stashed changes
 from input.mouse_controller import MouseController
 from input.event_loop import EventLoop
 
@@ -19,7 +23,9 @@ def get_screen_size():
 
 def main():
     cam = Webcam(index=0, window_name="Hand Tracker")
-    tracker = HandTracker(max_num_hands=1)
+    tracker = HandTracker(max_num_hands=2)
+
+    frame_detector = FrameDetector()
 
     pinch = PinchDetector(
         pinch_threshold=0.045,
@@ -56,6 +62,7 @@ def main():
             tracker.draw(frame, results)
 
             if results.multi_hand_landmarks:
+                # 1. Pinch Detection (using first detected hand)
                 hand = results.multi_hand_landmarks[0]
 
                 # cursor move every frame
@@ -64,6 +71,10 @@ def main():
 
                 # pinch click events
                 for ev in pinch.update(hand):
+                    events.emit(ev)
+
+                # 2. Frame Gesture Detection (passing all results)
+                for ev in frame_detector.update(results):
                     events.emit(ev)
 
             if cam.show(frame):

@@ -30,3 +30,5 @@ class EventLoop:
             elif isinstance(ev, tuple) and ev[0] == "MOVE":
                 _, x, y = ev
                 self.mouse.move_to(x, y)
+            elif ev == "SCREENSHOT":
+                self.mouse.screenshot()
