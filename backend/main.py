@@ -7,10 +7,13 @@ from gestures.pinch import PinchDetector
 from gestures.cursor import CursorMapper
 
 from gestures.frame import FrameDetector
-from input.mouse_controller import MouseController
 from input.event_loop import EventLoop
 
-from Quartz import CGDisplayBounds, CGMainDisplayID
+try:
+    from Quartz import CGDisplayBounds, CGMainDisplayID
+except ImportError:
+    CGDisplayBounds = None
+    CGMainDisplayID = None
 
 
 def get_screen_size():
@@ -18,7 +21,14 @@ def get_screen_size():
     return int(b.size.width), int(b.size.height)
 
 
+import argparse
+import sys
+
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--hid", action="store_true", help="Run in HID mode (Raspberry Pi)")
+    args = parser.parse_args()
+
     cam = Webcam(index=0, window_name="Hand Tracker")
     tracker = HandTracker(max_num_hands=2)
 
@@ -31,12 +41,36 @@ def main():
     )
 
     # Mouse controller + event loop (runs OS input on separate thread)
-    mouse = MouseController()
-    events = EventLoop(mouse)
+    # Mouse controller + event loop (runs OS input on separate thread)
+    if args.hid:
+        try:
+            from input.hid_controller import HIDController
+            from utils.bt_service import register_hid_profile
+            
+            # Register profile so Mac sees us as a Mouse
+            try:
+                register_hid_profile()
+            except Exception as e:
+                print(f"Warning: Failed to register SDP: {e}")
+
+            mouse = HIDController()
+            print("Using HID Controller (Bluetooth)")
+        except ImportError:
+            print("Error: python-evdev not installed. Cannot run in --hid mode.")
+            return
+        events = EventLoop(mouse)
+    else:
+        from input.mouse_controller import MouseController
+        mouse = MouseController()
+        events = EventLoop(mouse)
+
     events.start()
 
     # Use macOS Quartz for real screen size (prevents "invisible wall")
-    screen_w, screen_h = get_screen_size()
+    if not args.hid and CGDisplayBounds:
+        screen_w, screen_h = get_screen_size()
+    else:
+        screen_w, screen_h = 1920, 1080 # Default
     print("screen:", screen_w, screen_h)
 
     # Cursor mapping (tune these)
@@ -61,9 +95,13 @@ def main():
             if results.multi_hand_landmarks:
                 # 1. Pinch Detection (using first detected hand)
                 hand = results.multi_hand_landmarks[0]
+                # DEBUG: Process hand
+                if args.hid:
+                     print("Hand detected!")
 
                 # cursor move every frame
                 x, y = cursor.update(hand)
+                print(f"DEBUG Main: emitting MOVE {x}, {y}")
                 events.emit(("MOVE", x, y))
 
                 # pinch click events
@@ -74,8 +112,9 @@ def main():
                 for ev in frame_detector.update(results):
                     events.emit(ev)
 
-            if cam.show(frame):
-                break
+            if not args.hid:
+                if cam.show(frame):
+                    break
 
     finally:
         events.stop()
