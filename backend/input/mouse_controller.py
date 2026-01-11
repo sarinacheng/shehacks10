@@ -34,4 +34,10 @@ class MouseController:
 
     def paste(self):
         pyautogui.hotkey("command", "v")
+    
+    def control_right(self):
+        pyautogui.hotkey("ctrl", "right")
+    
+    def control_left(self):
+        pyautogui.hotkey("ctrl", "left")
 

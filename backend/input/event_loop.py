@@ -41,6 +41,10 @@ class EventLoop:
             self.mouse.scroll(0, dy)
         elif event == "SCREENSHOT":
             self.mouse.screenshot()
+        elif event == "CONTROL_RIGHT":
+            self.mouse.control_right()
+        elif event == "CONTROL_LEFT":
+            self.mouse.control_left()
         # COPY/PASTE now handled inside CopyPasteGestureHandler via pyautogui
 
 

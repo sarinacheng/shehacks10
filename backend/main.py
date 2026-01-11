@@ -15,6 +15,7 @@ from gestures.cursor import CursorMapper
 from gestures.copy_paste import CopyPasteGestureHandler
 from gestures.frame import FrameDetector
 from gestures.stop_resume import StopResumeDetector
+from gestures.palm_arrow import PalmArrowDetector
 
 from input.mouse_controller import MouseController
 from input.event_loop import EventLoop
@@ -82,6 +83,7 @@ def main():
     frame_detector = FrameDetector()
     copy_paste = CopyPasteGestureHandler()
     stop_resume = StopResumeDetector()
+    palm_arrow = PalmArrowDetector()
 
     scroll = ScrollDetector(
         finger_raise_threshold=0.005,  # More lenient - works with fingers side by side
@@ -160,6 +162,11 @@ def main():
                 # Frame gestures
                 for ev in frame_detector.update(results):
                     events.emit(ev)
+                
+                # Palm arrow gestures (works with any hand detected)
+                palm_event = palm_arrow.update(results)
+                if palm_event:
+                    events.emit(palm_event)
 
             if cam.show(frame):
                 break
