@@ -1,3 +1,5 @@
+# backend/main.py
+
 from camera.webcam import Webcam
 from tracking.hand_tracker import HandTracker
 
@@ -6,6 +8,13 @@ from gestures.cursor import CursorMapper
 
 from input.mouse_controller import MouseController
 from input.event_loop import EventLoop
+
+from Quartz import CGDisplayBounds, CGMainDisplayID
+
+
+def get_screen_size():
+    b = CGDisplayBounds(CGMainDisplayID())
+    return int(b.size.width), int(b.size.height)
 
 
 def main():
@@ -18,17 +27,24 @@ def main():
         cooldown_s=0.20
     )
 
-    # Create mouse controller first so we can get screen size
+    # Mouse controller + event loop (runs OS input on separate thread)
     mouse = MouseController()
-    screen_w, screen_h = mouse.screen_w, mouse.screen_h
-
-    # Now cursor mapper can use screen size
-    # cursor = CursorMapper(screen_w, screen_h, offset_px=(40, 0))   # 40px to the right
-    # or
-    cursor = CursorMapper(screen_w, screen_h, offset_px=(5, 0)) # right + a bit up
-
     events = EventLoop(mouse)
     events.start()
+
+    # Use macOS Quartz for real screen size (prevents "invisible wall")
+    screen_w, screen_h = get_screen_size()
+    print("screen:", screen_w, screen_h)
+
+    # Cursor mapping (tune these)
+    cursor = CursorMapper(
+        screen_w, screen_h,
+        roi_x_min=0.05, roi_x_max=0.95,
+        roi_y_min=0.10, roi_y_max=0.90,
+        gain=2.2,
+        smoothing=0.15,
+        offset_px=(5, 0)   # cursor appears slightly beside fingertip
+    )
 
     try:
         while True:
@@ -52,6 +68,7 @@ def main():
 
             if cam.show(frame):
                 break
+
     finally:
         events.stop()
         cam.release()
