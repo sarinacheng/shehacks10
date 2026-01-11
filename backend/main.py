@@ -4,6 +4,7 @@ import time
 import cv2
 import numpy as np
 import threading
+import subprocess
 
 from camera.webcam import Webcam
 from tracking.hand_tracker import HandTracker
@@ -13,6 +14,7 @@ from gestures.scroll import ScrollDetector
 from gestures.cursor import CursorMapper
 from gestures.copy_paste import CopyPasteGestureHandler
 from gestures.frame import FrameDetector
+from gestures.stop_resume import StopResumeDetector
 
 from input.mouse_controller import MouseController
 from input.event_loop import EventLoop
@@ -42,6 +44,29 @@ def get_screen_size():
     return int(b.size.width), int(b.size.height)
 
 
+def show_notification(title: str, message: str) -> None:
+    """Show both a notification banner and pop-up dialog"""
+    # Escape quotes and special characters
+    escaped_message = message.replace('"', '\\"').replace('\\', '\\\\')
+    escaped_title = title.replace('"', '\\"').replace('\\', '\\\\')
+    
+    # Notification banner (top right corner)
+    notification_script = f'''
+    display notification "{escaped_message}" with title "{escaped_title}" sound name "Glass"
+    '''
+    
+    # Pop-up dialog (center of screen)
+    dialog_script = f'''
+    display dialog "{escaped_message}" with title "{escaped_title}" buttons {{"OK"}} default button "OK" giving up after 2
+    '''
+    
+    # Show both
+    subprocess.Popen(["osascript", "-e", notification_script], 
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.Popen(["osascript", "-e", dialog_script], 
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
 def main():
     # ---------- Camera & Tracking ----------
     cam = Webcam(index=0, window_name="Hand Tracker")
@@ -56,6 +81,7 @@ def main():
 
     frame_detector = FrameDetector()
     copy_paste = CopyPasteGestureHandler()
+    stop_resume = StopResumeDetector()
 
     scroll = ScrollDetector(
         finger_raise_threshold=0.015,
@@ -83,6 +109,10 @@ def main():
         offset_px=(5, 0)
     )
 
+    # ---------- Feature Control ----------
+    features_enabled = True  # Start with features enabled
+    print("[INFO] Hand gesture features ENABLED. Raise both palms to disable, make semi-circles with both hands to resume.")
+
     try:
         while True:
             frame = cam.read()
@@ -92,7 +122,19 @@ def main():
             results = tracker.process(frame)
             tracker.draw(frame, results)
 
-            if results.multi_hand_landmarks:
+            # Check for STOP/RESUME gestures first (works regardless of features_enabled state)
+            stop_resume_event = stop_resume.update(results)
+            if stop_resume_event == "STOP":
+                features_enabled = False
+                print("[INFO] Features DISABLED. Make semi-circles with both hands to resume.")
+                show_notification("Paused!", "Paused!")
+            elif stop_resume_event == "RESUME":
+                features_enabled = True
+                print("[INFO] Features ENABLED. Raise both palms to disable.")
+                show_notification("Resumed!", "Resumed!")
+
+            # Only process other gestures if features are enabled
+            if features_enabled and results.multi_hand_landmarks:
                 hand = results.multi_hand_landmarks[0]
 
                 # Copy/Paste handler works internally (no events needed)
