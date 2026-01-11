@@ -1,6 +1,5 @@
 from pynput.mouse import Controller, Button
 from pynput.keyboard import Controller as KeyboardController, Key
-from PIL import ImageGrab
 import pyautogui
 
 class MouseController:
@@ -24,7 +23,7 @@ class MouseController:
         self.mouse.click(Button.left, 1)
 
     def screenshot(self):
-        return ImageGrab.grab()
+        pyautogui.hotkey("command", "shift", "3")
 
     def scroll(self, dx, dy):
         # dx ignored; dy >0 scrolls up in pynput

@@ -40,9 +40,7 @@ class EventLoop:
             _, dy = event
             self.mouse.scroll(0, dy)
         elif event == "SCREENSHOT":
-            img = self.mouse.screenshot()
-            if self.screenshot_preview_callback:
-                self.screenshot_preview_callback(img)
+            self.mouse.screenshot()
         # COPY/PASTE now handled inside CopyPasteGestureHandler via pyautogui
 
 

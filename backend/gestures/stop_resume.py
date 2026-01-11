@@ -26,19 +26,25 @@ class StopResumeDetector:
     def __init__(
         self,
         stop_hold_time=1.0,  # Hold both palms up for 1 second to stop
-        semi_circle_radius_threshold=0.03,  # Minimum radius for semi-circle detection
-        semi_circle_angle_threshold=2.5,  # Minimum angle coverage for semi-circle (radians, ~143 degrees)
-        circle_time_window=2.0  # Time window to complete both semi-circles
+        circle_time_window=2.0,  # Time window to track hand movements
+        min_arc_points=5,  # Minimum points needed to detect arc motion
+        min_arc_angle=1.5,  # Minimum angle span for arc detection (radians, ~86 degrees)
+        min_arc_radius=0.02,  # Minimum radius for arc to be considered valid
+        finger_tip_connection_threshold=0.06  # Maximum distance between finger tips to consider them "connected"
     ):
         self.stop_hold_time = stop_hold_time
-        self.semi_circle_radius_threshold = semi_circle_radius_threshold
-        self.semi_circle_angle_threshold = semi_circle_angle_threshold
         self.circle_time_window = circle_time_window
+        self.min_arc_points = min_arc_points
+        self.min_arc_angle = min_arc_angle
+        self.min_arc_radius = min_arc_radius
+        self.finger_tip_connection_threshold = finger_tip_connection_threshold
         
         # State tracking
         self._stop_gesture_start = None
         self._left_hand_positions = []  # List of (x, y, time) tuples for left hand
         self._right_hand_positions = []  # List of (x, y, time) tuples for right hand
+        self._last_resume_time = 0.0
+        self._resume_cooldown = 0.8  # Cooldown between resume detections
         
     def _all_fingers_extended(self, hand_landmarks) -> bool:
         """Check if all 5 fingers are extended"""
@@ -84,53 +90,47 @@ class StopResumeDetector:
         
         return True
     
-    def _detect_semi_circle(self, positions) -> bool:
-        """Detect if positions form a semi-circle"""
-        if len(positions) < 5:
-            return False
-        
+    def _detect_arc_motion(self, positions) -> bool:
+        """Simple check if positions form an arc (semi-circle motion)"""
         now = time.time()
-        # Remove old positions
-        recent_positions = [(x, y, t) for x, y, t in positions if (now - t) <= self.circle_time_window]
+        # Get recent positions
+        recent = [(x, y, t) for x, y, t in positions if (now - t) <= self.circle_time_window]
         
-        if len(recent_positions) < 5:
+        if len(recent) < self.min_arc_points:
             return False
         
-        # Calculate center
-        center_x = sum(x for x, y, t in recent_positions) / len(recent_positions)
-        center_y = sum(y for x, y, t in recent_positions) / len(recent_positions)
+        # Simple approach: check if there's significant angular change
+        # Calculate center of recent positions
+        center_x = sum(x for x, y, t in recent) / len(recent)
+        center_y = sum(y for x, y, t in recent) / len(recent)
+        
+        # Calculate angles relative to center
+        angles = [math.atan2(y - center_y, x - center_x) for x, y, t in recent]
         
         # Calculate average radius
         radii = [
             math.sqrt((x - center_x)**2 + (y - center_y)**2)
-            for x, y, t in recent_positions
+            for x, y, t in recent
         ]
         avg_radius = sum(radii) / len(radii)
         
         # Check if radius is large enough
-        if avg_radius < self.semi_circle_radius_threshold:
+        if avg_radius < self.min_arc_radius:
             return False
         
-        # Calculate angles relative to center
-        angles = []
-        for x, y, t in recent_positions:
-            angle = math.atan2(y - center_y, x - center_x)
-            angles.append(angle)
-        
-        # Sort angles and calculate total angle coverage
+        # Calculate angular span
         angles_sorted = sorted(angles)
-        # Calculate total angular span
-        total_span = angles_sorted[-1] - angles_sorted[0]
+        span = angles_sorted[-1] - angles_sorted[0]
         
-        # Handle wrap-around case
-        if total_span < 0:
-            total_span += 2 * math.pi
+        # Handle wrap-around
+        if span < 0:
+            span += 2 * math.pi
         
-        # Check if the span covers at least a semi-circle
-        return total_span >= self.semi_circle_angle_threshold
+        # Check if span is large enough for a semi-circle
+        return span >= self.min_arc_angle
     
     def _detect_two_hand_circle_gesture(self, results) -> bool:
-        """Detect if both hands are making semi-circles"""
+        """Detect when both hands make semi-circles and come together"""
         if not results.multi_hand_landmarks or len(results.multi_hand_landmarks) != 2:
             return False
         
@@ -154,7 +154,7 @@ class StopResumeDetector:
         if not lms_left or not lms_right:
             return False
         
-        # Track positions for both hands
+        # Get current finger tip positions
         left_x = lms_left.landmark[INDEX_TIP].x
         left_y = lms_left.landmark[INDEX_TIP].y
         right_x = lms_right.landmark[INDEX_TIP].x
@@ -174,11 +174,16 @@ class StopResumeDetector:
             if (now - t) <= self.circle_time_window
         ]
         
-        # Check if both hands are making semi-circles
-        left_semi_circle = self._detect_semi_circle(self._left_hand_positions)
-        right_semi_circle = self._detect_semi_circle(self._right_hand_positions)
+        # Check if both hands are making arc motions (semi-circles)
+        left_arc = self._detect_arc_motion(self._left_hand_positions)
+        right_arc = self._detect_arc_motion(self._right_hand_positions)
         
-        return left_semi_circle and right_semi_circle
+        # Check if finger tips are currently close together (connected)
+        finger_tip_distance = math.sqrt((left_x - right_x)**2 + (left_y - right_y)**2)
+        fingers_connected = finger_tip_distance <= self.finger_tip_connection_threshold
+        
+        # Resume when both hands are making arcs AND they come together
+        return left_arc and right_arc and fingers_connected
     
     def update(self, results) -> Optional[str]:
         """
@@ -204,10 +209,13 @@ class StopResumeDetector:
             self._stop_gesture_start = None
         
         # Check for RESUME gesture (both hands making semi-circles)
-        if self._detect_two_hand_circle_gesture(results):
-            events = "RESUME"
-            # Reset positions after detecting
-            self._left_hand_positions = []
-            self._right_hand_positions = []
+        # Only check if cooldown has passed
+        if (now - self._last_resume_time) >= self._resume_cooldown:
+            if self._detect_two_hand_circle_gesture(results):
+                events = "RESUME"
+                self._last_resume_time = now
+                # Reset positions after detecting
+                self._left_hand_positions = []
+                self._right_hand_positions = []
         
         return events
