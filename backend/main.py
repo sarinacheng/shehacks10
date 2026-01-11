@@ -11,7 +11,7 @@ from tracking.hand_tracker import HandTracker
 from gestures.pinch import PinchDetector
 from gestures.scroll import ScrollDetector
 from gestures.cursor import CursorMapper
-from gestures.copy_paste import CopyPasteDetector
+from gestures.copy_paste import CopyPasteGestureHandler
 from gestures.frame import FrameDetector
 
 from input.mouse_controller import MouseController
@@ -55,11 +55,7 @@ def main():
     )
 
     frame_detector = FrameDetector()
-    copy_paste = CopyPasteDetector(
-        open_threshold=0.25,
-        closed_threshold=0.12,  # ← lower = accepts thumb-out fists
-        hold_duration=2.0
-    )
+    copy_paste = CopyPasteGestureHandler()
 
     scroll = ScrollDetector(
         finger_raise_threshold=0.015,
@@ -99,19 +95,15 @@ def main():
             if results.multi_hand_landmarks:
                 hand = results.multi_hand_landmarks[0]
 
-                # Copy/paste in progress if we're holding a pose
-                cp_in_progress = copy_paste._hold_start_t is not None
+                # Copy/Paste handler works internally (no events needed)
+                copy_paste.process_landmarks(hand)
 
-                # Disable scroll while copy/paste is in progress
-                if not cp_in_progress:
-                    scroll_events = scroll.update(hand)
-                    is_scrolling = scroll.is_scrolling()
-                else:
-                    scroll_events = []
-                    is_scrolling = False
+                # Scroll updates
+                scroll_events = scroll.update(hand)
+                is_scrolling = scroll.is_scrolling()
 
-                # Cursor move only when not scrolling and not in copy/paste hold
-                if not is_scrolling and not cp_in_progress:
+                # Cursor move only when not scrolling
+                if not is_scrolling:
                     x, y = cursor.update(hand)
                     events.emit(("MOVE", x, y))
 
@@ -119,18 +111,9 @@ def main():
                 for ev in pinch.update(hand):
                     events.emit(ev)
 
-                # Scroll
+                # Scroll events
                 for ev in scroll_events:
                     events.emit(ev)
-
-                # Copy/Paste — only when not dragging and not scrolling
-                if not pinch._dragging and not is_scrolling:
-                    cp_events = copy_paste.update(hand)
-                    if cp_in_progress:
-                        print("Copy/Paste: holding pose…", end="\r")
-                    for ev in cp_events:
-                        print(f"Gesture detected: {ev}")
-                        events.emit(ev)
 
                 # Frame gestures
                 for ev in frame_detector.update(results):

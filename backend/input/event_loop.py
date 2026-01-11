@@ -17,15 +17,13 @@ class EventLoop:
         self.q.put(None)
 
     def emit(self, event):
-        # event: "CLICK", "PINCH_START", "PINCH_END", "SCREENSHOT", ("MOVE", x, y), or ("SCROLL", dy)
         self.q.put(event)
 
     def _run(self):
         while not self._stop.is_set():
             ev = self.q.get()
             if ev is None:
-                continue
-
+                break
             self._process(ev)
 
     def _process(self, event):
@@ -38,10 +36,6 @@ class EventLoop:
             self.mouse.left_down()
         elif event == "PINCH_END":
             self.mouse.left_up()
-        elif event == "COPY":
-            self.mouse.copy()
-        elif event == "PASTE":
-            self.mouse.paste()
         elif event[0] == "SCROLL":
             _, dy = event
             self.mouse.scroll(0, dy)
@@ -49,7 +43,8 @@ class EventLoop:
             img = self.mouse.screenshot()
             if self.screenshot_preview_callback:
                 self.screenshot_preview_callback(img)
+        # COPY/PASTE now handled inside CopyPasteGestureHandler via pyautogui
 
 
 
-                
+
