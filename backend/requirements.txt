@@ -15,22 +15,12 @@ packaging==25.0
 pillow==12.1.0
 protobuf>=4.25.3,<5
 pycparser==2.23
-pynput==1.8.1
-pyautogui==0.9.54
-pyobjc-core==12.1
-pyobjc-framework-ApplicationServices==12.1
-pyobjc-framework-Cocoa==12.1
-pyobjc-framework-CoreText==12.1
-pyobjc-framework-Quartz==12.1
 pyparsing==3.3.1
 python-dateutil==2.9.0.post0
 six==1.17.0
 sounddevice==0.5.3
 websockets==16.0
-
-
-
-
-
-
-
+# Raspberry Pi / Bluetooth dependencies
+dbus-python
+pygobject
+evdev

@@ -6,7 +6,7 @@
 #   COPY  -> 🤌 All five fingertips bundled tightly together (hold 1s)
 #   PASTE -> ✋ All five fingers extended and spread apart (hold 1s)
 #
-# This module DOES NOT touch networking.
+# This module DOES NOT touch networking or local input directly.
 # It triggers callbacks:
 #   on_copy()
 #   on_paste()
@@ -17,8 +17,6 @@
 
 import time
 import math
-import subprocess
-import pyautogui
 from typing import Optional, Callable
 
 # MediaPipe landmark indices
@@ -171,35 +169,11 @@ class CopyPasteGestureHandler:
 
     # ---------- Actions ----------
 
-    def _show_notification(self, title: str, message: str) -> None:
-        """Show both a notification banner and pop-up dialog"""
-        # Escape quotes and special characters
-        escaped_message = message.replace('"', '\\"').replace('\\', '\\\\')
-        escaped_title = title.replace('"', '\\"').replace('\\', '\\\\')
-        
-        # Notification banner (top right corner)
-        notification_script = f'''
-        display notification "{escaped_message}" with title "{escaped_title}" sound name "Glass"
-        '''
-        
-        # Pop-up dialog (center of screen)
-        dialog_script = f'''
-        display dialog "{escaped_message}" with title "{escaped_title}" buttons {{"OK"}} default button "OK" giving up after 2
-        '''
-        
-        # Show both
-        subprocess.Popen(["osascript", "-e", notification_script], 
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.Popen(["osascript", "-e", dialog_script], 
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
     def _trigger_action(self, gesture: str) -> None:
         if gesture == "copy":
-            pyautogui.hotkey("command", "c")
             if self.on_copy:
-                self.on_copy()   # this lets main.py push to the server
+                self.on_copy()
             print("COPY triggered")
-            self._show_notification("Copied!", "Copied!")
 
         elif gesture == "paste":
             if self.on_paste:
