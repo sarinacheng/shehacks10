@@ -56,7 +56,7 @@ SDP_RECORD_XML = """
       <sequence>
         <sequence>
           <uuid value="0x0100" />
-          <uint16 value="0x0011" />
+          <uint16 value="0x0013" />
         </sequence>
         <sequence>
           <uuid value="0x0011" />
