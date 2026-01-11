@@ -7,11 +7,26 @@ class MouseController:
     def __init__(self):
         self.mouse = Controller()
         self.screen_w, self.screen_h = self._get_screen_size()
+        self._left_down = False  # 👈 IMPORTANT STATE
 
     def _get_screen_size(self):
         # Move mouse to bottom-right corner to infer size
         self.mouse.position = (99999, 99999)
         return self.mouse.position
+
+    def move_to(self, x, y):
+        self.mouse.position = (int(x), int(y))
+
+    # ---------- CLICK / HOLD ----------
+    def left_down(self):
+        if not self._left_down:
+            self.mouse.press(Button.left)
+            self._left_down = True
+
+    def left_up(self):
+        if self._left_down:
+            self.mouse.release(Button.left)
+            self._left_down = False
 
     def click_left(self):
         self.mouse.click(Button.left, 1)
@@ -35,5 +50,11 @@ class MouseController:
         except Exception as e:
             print(f"Failed to take screenshot: {e}")
 
-    def move_to(self, x, y):
-        self.mouse.position = (x, y)
+    # def move_to(self, x, y):
+    #     self.mouse.position = (x, y)
+
+    def press(self):
+        self.mouse.press(Button.left)
+
+    def release(self):
+        self.mouse.release(Button.left)

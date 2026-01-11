@@ -16,7 +16,7 @@ class EventLoop:
         self.q.put(None)
 
     def emit(self, event):
-        # event can be a string ("PINCH_START") OR a tuple ("MOVE", x, y)
+        # event: "PINCH_START", "PINCH_END", or ("MOVE", x, y)
         self.q.put(event)
 
     def _run(self):
@@ -25,10 +25,17 @@ class EventLoop:
             if ev is None:
                 continue
 
-            if ev == "PINCH_START":
-                self.mouse.click_left()
-            elif isinstance(ev, tuple) and ev[0] == "MOVE":
-                _, x, y = ev
-                self.mouse.move_to(x, y)
-            elif ev == "SCREENSHOT":
+            self._process(ev)
+
+    def _process(self, event):
+        if event[0] == "MOVE":
+            _, x, y = event
+            self.mouse.move_to(x, y)
+        elif event == "CLICK":
+            self.mouse.click_left()
+        elif event == "PINCH_START":
+            self.mouse.left_down()
+        elif event == "PINCH_END":
+            self.mouse.left_up()
+        elif event == "SCREENSHOT":
                 self.mouse.screenshot()

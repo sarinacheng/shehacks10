@@ -27,8 +27,9 @@ def main():
     pinch = PinchDetector(
         pinch_threshold=0.045,
         release_threshold=0.060,
-        cooldown_s=0.20
-    )
+        hold_delay_s=0.25
+    )   
+
 
     # Mouse controller + event loop (runs OS input on separate thread)
     mouse = MouseController()
@@ -67,7 +68,11 @@ def main():
                 events.emit(("MOVE", x, y))
 
                 # pinch click events
-                for ev in pinch.update(hand):
+                pinch_events = pinch.update(hand)
+                for ev in pinch_events:
+                    events.emit(ev)
+                # pinch.handle_pinch_events(pinch_events)
+                for ev in pinch_events:
                     events.emit(ev)
 
                 # 2. Frame Gesture Detection (passing all results)
