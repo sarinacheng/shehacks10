@@ -5,6 +5,8 @@ from utils.constants import INDEX_TIP, MIDDLE_TIP
 # MediaPipe landmark indices for finger joints
 INDEX_PIP = 6
 MIDDLE_PIP = 10
+RING_TIP, PINKY_TIP = 16, 20
+RING_PIP, PINKY_PIP = 14, 18
 
 class ScrollDetector:
     """
@@ -60,13 +62,24 @@ class ScrollDetector:
         # Check if fingers are together (primary requirement)
         fingers_together = self._fingers_together(lms)
         
-        # Check if fingers are at least somewhat extended (more lenient check)
+        # Check if index and middle fingers are extended
         index_raised = self._is_finger_raised(lms, INDEX_TIP, INDEX_PIP)
         middle_raised = self._is_finger_raised(lms, MIDDLE_TIP, MIDDLE_PIP)
         
-        # If fingers are together, allow scrolling (fingers don't need to be fully raised)
-        # This makes it work when fingers are side by side
-        if fingers_together and (index_raised or middle_raised):
+        # Check that ring and pinky are NOT extended (critical to distinguish from swipe)
+        # Ring and pinky should be below their PIP joints (not extended)
+        # Use stricter check: tips should be at or below PIP joints
+        ring_not_extended = lms[RING_TIP].y >= lms[RING_PIP].y
+        pinky_not_extended = lms[PINKY_TIP].y >= lms[PINKY_PIP].y
+        
+        # Scroll requires: 
+        # - Index AND middle together and raised (both must be raised)
+        # - Ring AND pinky NOT extended (both must be down)
+        # This ensures exactly 2 fingers, not 4
+        exactly_two_fingers = (index_raised and middle_raised and 
+                             ring_not_extended and pinky_not_extended)
+        
+        if fingers_together and exactly_two_fingers:
             current_y = self._get_average_y(lms)
             
             if self._last_y_position is not None:

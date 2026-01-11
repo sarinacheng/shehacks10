@@ -16,6 +16,7 @@ from gestures.copy_paste import CopyPasteGestureHandler
 from gestures.frame import FrameDetector
 from gestures.stop_resume import StopResumeDetector
 from gestures.palm_arrow import PalmArrowDetector
+from gestures.swipe import SwipeDetector
 
 from input.mouse_controller import MouseController
 from input.event_loop import EventLoop
@@ -75,15 +76,16 @@ def main():
 
     # ---------- Gesture Detectors ----------
     pinch = PinchDetector(
-        pinch_threshold=0.065,  # Slightly less sensitive
-        release_threshold=0.085,  # Slightly less forgiving release
-        hold_delay_s=0.12  # Slightly slower click response
+        pinch_threshold=0.045,  # More sensitive - easier to trigger
+        release_threshold=0.065,  # More forgiving release
+        hold_delay_s=0.08  # Faster click response
     )
 
     frame_detector = FrameDetector()
     copy_paste = CopyPasteGestureHandler()
     stop_resume = StopResumeDetector()
     palm_arrow = PalmArrowDetector()
+    swipe = SwipeDetector()
 
     scroll = ScrollDetector(
         finger_raise_threshold=0.005,  # More lenient - works with fingers side by side
@@ -138,25 +140,43 @@ def main():
             # Only process other gestures if features are enabled
             if features_enabled and results.multi_hand_landmarks:
                 hand = results.multi_hand_landmarks[0]
+                
+                # Get hand label for swipe detection
+                hand_label = None
+                if results.multi_handedness:
+                    for idx, classification in enumerate(results.multi_handedness):
+                        if idx < len(results.multi_hand_landmarks) and results.multi_hand_landmarks[idx] == hand:
+                            hand_label = classification.classification[0].label
+                            break
 
                 # Copy/Paste handler works internally (no events needed)
                 copy_paste.process_landmarks(hand)
 
-                # Scroll updates
-                scroll_events = scroll.update(hand)
-                is_scrolling = scroll.is_scrolling()
+                # Swipe gestures (check first, before scroll, to avoid conflicts)
+                # 4 fingers together on right hand → Control Right
+                # 4 fingers together on left hand → Control Left
+                swipe_event = swipe.update(hand, hand_label)
+                
+                # Scroll updates (only process if swipe not detected)
+                if not swipe_event:
+                    scroll_events = scroll.update(hand)
+                    is_scrolling = scroll.is_scrolling()
 
-                # Cursor move only when not scrolling
-                if not is_scrolling:
-                    x, y = cursor.update(hand)
-                    events.emit(("MOVE", x, y))
+                    # Cursor move only when not scrolling
+                    if not is_scrolling:
+                        x, y = cursor.update(hand)
+                        events.emit(("MOVE", x, y))
+
+                    # Scroll events
+                    for ev in scroll_events:
+                        events.emit(ev)
+                else:
+                    # Swipe detected - emit the event
+                    events.emit(swipe_event)
+                    print(f"[SWIPE] Event emitted: {swipe_event}")
 
                 # Pinch click/drag
                 for ev in pinch.update(hand):
-                    events.emit(ev)
-
-                # Scroll events
-                for ev in scroll_events:
                     events.emit(ev)
 
                 # Frame gestures
