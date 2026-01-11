@@ -36,3 +36,7 @@ class NetBridge:
             "from": self.name,
             "text": text
         }))
+
+    async def send_clipboard_after_copy(self, delay: float = 0.2):
+        await asyncio.sleep(delay)
+        await self.send_clipboard()

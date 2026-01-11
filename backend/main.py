@@ -97,7 +97,13 @@ def main():
     net_loop.call_soon_threadsafe(net_loop.create_task, net.run())
 
     copy_paste = CopyPasteGestureHandler(
-        on_copy=lambda: net_loop.call_soon_threadsafe(net_loop.create_task, net.send_clipboard()),
+        on_copy=lambda: (
+            mouse.copy(),  # perform Cmd+C locally
+            net_loop.call_soon_threadsafe(
+                net_loop.create_task,
+                net.send_clipboard_after_copy(0.2)  # send after clipboard updates
+            )
+        ),
         on_paste=lambda: mouse.paste(),
     )
 
