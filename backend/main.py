@@ -411,10 +411,6 @@ def main():
         offset_px=(5, 0)   # cursor appears slightly beside fingertip
     )
 
-    # Screenshot notification state (for camera feed overlay)
-    screenshot_notification_end_time = 0
-    notification_duration = 2.0  # Show for 2 seconds
-
     try:
         while True:
             frame = cam.read()
@@ -450,46 +446,7 @@ def main():
                 for ev in frame_detector.update(results):
                     if ev == "SCREENSHOT":
                         print(f"Main: Emitting SCREENSHOT event")
-                        # Trigger notification on camera feed
-                        screenshot_notification_end_time = time.time() + notification_duration
                     events.emit(ev)
-
-            # Add screenshot notification overlay on camera feed (always visible)
-            current_time = time.time()
-            if current_time < screenshot_notification_end_time:
-                # Calculate fade (fade out in last 0.5 seconds)
-                elapsed = screenshot_notification_end_time - current_time
-                if elapsed > 0.5:
-                    alpha = 1.0
-                else:
-                    alpha = elapsed / 0.5  # Fade out
-                
-                # Add text overlay: "📸 Screenshot Saved!"
-                text = "Screenshot Saved!"
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                font_scale = 1.5
-                thickness = 3
-                color = (0, 255, 0)  # Green
-                
-                # Get text size for centering
-                (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, thickness)
-                frame_height, frame_width = frame.shape[:2]
-                
-                # Position: bottom center
-                x = (frame_width - text_width) // 2
-                y = frame_height - 50
-                
-                # Add semi-transparent black background
-                overlay = frame.copy()
-                cv2.rectangle(overlay, 
-                            (x - 20, y - text_height - 20), 
-                            (x + text_width + 20, y + baseline + 20),
-                            (0, 0, 0), -1)
-                frame = cv2.addWeighted(overlay, 0.7 * alpha, frame, 1.0 - 0.7 * alpha, 0)
-                
-                # Add text with border for visibility
-                cv2.putText(frame, text, (x, y), font, font_scale, (0, 0, 0), thickness + 2)  # Black border
-                cv2.putText(frame, text, (x, y), font, font_scale, color, thickness)  # Green text
 
             if cam.show(frame):
                 break
