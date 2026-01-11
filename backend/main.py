@@ -49,9 +49,9 @@ def main():
 
     # ---------- Gesture Detectors ----------
     pinch = PinchDetector(
-        pinch_threshold=0.030,
-        release_threshold=0.040,
-        hold_delay_s=0.25
+        pinch_threshold=0.065,  # Slightly less sensitive
+        release_threshold=0.085,  # Slightly less forgiving release
+        hold_delay_s=0.12  # Slightly slower click response
     )
 
     frame_detector = FrameDetector()
