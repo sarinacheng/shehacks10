@@ -135,6 +135,12 @@ def register_hid_profile():
     }
 
     try:
+        try:
+            manager.UnregisterProfile(path)
+            print("Unregistered old HID profile.")
+        except Exception:
+            pass # It wasn't registered, that's fine
+
         manager.RegisterProfile(path, uuid, opts)
         print("HID Profile Registered.")
     except Exception as e:
