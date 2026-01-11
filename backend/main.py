@@ -55,8 +55,10 @@ def main():
 
             mouse = HIDController()
             print("Using HID Controller (Bluetooth)")
-        except ImportError:
-            print("Error: python-evdev not installed. Cannot run in --hid mode.")
+        except ImportError as e:
+            print(f"Error importing HID modules: {e}")
+            import traceback
+            traceback.print_exc()
             return
         events = EventLoop(mouse)
     else:
