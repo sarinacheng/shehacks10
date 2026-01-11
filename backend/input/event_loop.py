@@ -29,29 +29,27 @@ class EventLoop:
             self._process(ev)
 
     def _process(self, event):
-        """Process events - supports click, hold/release, scroll, and screenshot"""
-        if isinstance(event, tuple) and event[0] == "MOVE":
+        if event[0] == "MOVE":
             _, x, y = event
             self.mouse.move_to(x, y)
         elif event == "CLICK":
-            # Short pinch = click
             self.mouse.click_left()
         elif event == "PINCH_START":
-            # Long pinch = hold (press) for drag functionality
             self.mouse.left_down()
         elif event == "PINCH_END":
-            # Release on pinch end
             self.mouse.left_up()
-        elif event == "SCREENSHOT":
-            print("EventLoop: Received SCREENSHOT event - triggering Command+Shift+3")
-            # Trigger macOS screenshot shortcut
-            success = self.mouse.screenshot()
-            if success:
-                print("✓ Screenshot shortcut triggered - macOS will handle the screenshot")
-            else:
-                print("✗ Failed to trigger screenshot shortcut")
-        elif isinstance(event, tuple) and event[0] == "SCROLL":
+        elif event == "COPY":
+            self.mouse.copy()
+        elif event == "PASTE":
+            self.mouse.paste()
+        elif event[0] == "SCROLL":
             _, dy = event
-            # pynput scroll: positive dy scrolls down, negative scrolls up
-            print(f"Executing scroll: {dy}")  # Debug output
             self.mouse.scroll(0, dy)
+        elif event == "SCREENSHOT":
+            img = self.mouse.screenshot()
+            if self.screenshot_preview_callback:
+                self.screenshot_preview_callback(img)
+
+
+
+                

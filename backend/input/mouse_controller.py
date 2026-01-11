@@ -57,3 +57,13 @@ class MouseController:
     def scroll(self, dx, dy):
         """Scroll the mouse wheel. dy: positive = scroll down, negative = scroll up"""
         self.mouse.scroll(dx, dy)
+    def copy(self):
+        with self.keyboard.pressed(Key.cmd):
+            self.keyboard.press('c')
+            self.keyboard.release('c')
+
+    def paste(self):
+        with self.keyboard.pressed(Key.cmd):
+            self.keyboard.press('v')
+            self.keyboard.release('v')
+
