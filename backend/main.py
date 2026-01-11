@@ -4,6 +4,7 @@ import time
 import cv2
 import numpy as np
 import threading
+import subprocess
 import asyncio
 
 from camera.webcam import Webcam
@@ -14,6 +15,9 @@ from gestures.scroll import ScrollDetector
 from gestures.cursor import CursorMapper
 from gestures.copy_paste import CopyPasteGestureHandler
 from gestures.frame import FrameDetector
+from gestures.stop_resume import StopResumeDetector
+from gestures.palm_arrow import PalmArrowDetector
+from gestures.swipe import SwipeDetector
 
 from input.mouse_controller import MouseController
 from input.event_loop import EventLoop
@@ -45,6 +49,29 @@ def get_screen_size():
     return int(b.size.width), int(b.size.height)
 
 
+def show_notification(title: str, message: str) -> None:
+    """Show both a notification banner and pop-up dialog"""
+    # Escape quotes and special characters
+    escaped_message = message.replace('"', '\\"').replace('\\', '\\\\')
+    escaped_title = title.replace('"', '\\"').replace('\\', '\\\\')
+    
+    # Notification banner (top right corner)
+    notification_script = f'''
+    display notification "{escaped_message}" with title "{escaped_title}" sound name "Glass"
+    '''
+    
+    # Pop-up dialog (center of screen)
+    dialog_script = f'''
+    display dialog "{escaped_message}" with title "{escaped_title}" buttons {{"OK"}} default button "OK" giving up after 2
+    '''
+    
+    # Show both
+    subprocess.Popen(["osascript", "-e", notification_script], 
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.Popen(["osascript", "-e", dialog_script], 
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
 def main():
     # ---------- Camera & Tracking ----------
     cam = Webcam(index=0, window_name="Hand Tracker")
@@ -52,18 +79,22 @@ def main():
 
     # ---------- Gesture Detectors ----------
     pinch = PinchDetector(
-        pinch_threshold=0.030,
-        release_threshold=0.040,
-        hold_delay_s=0.25
+        pinch_threshold=0.045,  # More sensitive - easier to trigger
+        release_threshold=0.065,  # More forgiving release
+        hold_delay_s=0.08  # Faster click response
     )
 
     frame_detector = FrameDetector()
+    copy_paste = CopyPasteGestureHandler()
+    stop_resume = StopResumeDetector()
+    palm_arrow = PalmArrowDetector()
+    swipe = SwipeDetector()
 
     scroll = ScrollDetector(
-        finger_raise_threshold=0.015,
-        min_scroll_delta=0.0005,
-        scroll_sensitivity=100.0,
-        finger_distance_threshold=0.04  # ← tighter = fingers must be closer
+        finger_raise_threshold=0.005,  # More lenient - works with fingers side by side
+        min_scroll_delta=0.0003,       # More responsive
+        scroll_sensitivity=150.0,      # Increased sensitivity
+        finger_distance_threshold=0.08  # More lenient - fingers can be slightly apart
     )
 
     # ---------- Mouse + Event Loop ----------
@@ -84,6 +115,10 @@ def main():
         smoothing=0.15,
         offset_px=(5, 0)
     )
+
+    # ---------- Feature Control ----------
+    features_enabled = True  # Start with features enabled
+    print("[INFO] Hand gesture features ENABLED. Raise both palms to disable, make semi-circles with both hands to resume.")
 
     # Start network bridge
     uri = "wss://c6696aad-54be-4a56-8d33-096dd3ccfbf5-00-j4ckoakwrx74.worf.replit.dev"
@@ -116,32 +151,67 @@ def main():
             results = tracker.process(frame)
             tracker.draw(frame, results)
 
-            if results.multi_hand_landmarks:
+            # Check for STOP/RESUME gestures first (works regardless of features_enabled state)
+            stop_resume_event = stop_resume.update(results)
+            if stop_resume_event == "STOP":
+                features_enabled = False
+                print("[INFO] Features DISABLED. Make semi-circles with both hands to resume.")
+                show_notification("Paused!", "Paused!")
+            elif stop_resume_event == "RESUME":
+                features_enabled = True
+                print("[INFO] Features ENABLED. Raise both palms to disable.")
+                show_notification("Resumed!", "Resumed!")
+
+            # Only process other gestures if features are enabled
+            if features_enabled and results.multi_hand_landmarks:
                 hand = results.multi_hand_landmarks[0]
+                
+                # Get hand label for swipe detection
+                hand_label = None
+                if results.multi_handedness:
+                    for idx, classification in enumerate(results.multi_handedness):
+                        if idx < len(results.multi_hand_landmarks) and results.multi_hand_landmarks[idx] == hand:
+                            hand_label = classification.classification[0].label
+                            break
 
                 # Copy/Paste handler works internally (no events needed)
                 copy_paste.process_landmarks(hand)
 
-                # Scroll updates
-                scroll_events = scroll.update(hand)
-                is_scrolling = scroll.is_scrolling()
+                # Swipe gestures (check first, before scroll, to avoid conflicts)
+                # 4 fingers together on right hand → Control Right
+                # 4 fingers together on left hand → Control Left
+                swipe_event = swipe.update(hand, hand_label)
+                
+                # Scroll updates (only process if swipe not detected)
+                if not swipe_event:
+                    scroll_events = scroll.update(hand)
+                    is_scrolling = scroll.is_scrolling()
 
-                # Cursor move only when not scrolling
-                if not is_scrolling:
-                    x, y = cursor.update(hand)
-                    events.emit(("MOVE", x, y))
+                    # Cursor move only when not scrolling
+                    if not is_scrolling:
+                        x, y = cursor.update(hand)
+                        events.emit(("MOVE", x, y))
+
+                    # Scroll events
+                    for ev in scroll_events:
+                        events.emit(ev)
+                else:
+                    # Swipe detected - emit the event
+                    events.emit(swipe_event)
+                    print(f"[SWIPE] Event emitted: {swipe_event}")
 
                 # Pinch click/drag
                 for ev in pinch.update(hand):
                     events.emit(ev)
 
-                # Scroll events
-                for ev in scroll_events:
-                    events.emit(ev)
-
                 # Frame gestures
                 for ev in frame_detector.update(results):
                     events.emit(ev)
+                
+                # Palm arrow gestures (works with any hand detected)
+                palm_event = palm_arrow.update(results)
+                if palm_event:
+                    events.emit(palm_event)
 
             if cam.show(frame):
                 break

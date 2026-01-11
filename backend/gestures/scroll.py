@@ -5,6 +5,8 @@ from utils.constants import INDEX_TIP, MIDDLE_TIP
 # MediaPipe landmark indices for finger joints
 INDEX_PIP = 6
 MIDDLE_PIP = 10
+RING_TIP, PINKY_TIP = 16, 20
+RING_PIP, PINKY_PIP = 14, 18
 
 class ScrollDetector:
     """
@@ -12,10 +14,10 @@ class ScrollDetector:
     Emits scroll events based on vertical movement of the two fingers.
     """
     def __init__(self, 
-                 finger_raise_threshold=0.015,  # How much tip must be above PIP for raised finger
-                 min_scroll_delta=0.0005,      # Minimum movement to trigger scroll
-                 scroll_sensitivity=100.0,     # Multiplier for scroll amount
-                 finger_distance_threshold=0.05):  # Max distance between fingers to count as "together"
+                 finger_raise_threshold=0.005,  # More lenient - fingers don't need to be fully extended
+                 min_scroll_delta=0.0003,      # Lower threshold for more responsive scrolling
+                 scroll_sensitivity=150.0,     # Increased sensitivity
+                 finger_distance_threshold=0.08):  # More lenient - fingers can be slightly apart
         self.finger_raise_threshold = finger_raise_threshold
         self.min_scroll_delta = min_scroll_delta
         self.scroll_sensitivity = scroll_sensitivity
@@ -57,13 +59,27 @@ class ScrollDetector:
         events = []
         lms = hand_landmarks.landmark
 
-        # Check if both index and middle fingers are raised (extended) AND together
-        index_raised = self._is_finger_raised(lms, INDEX_TIP, INDEX_PIP)
-        middle_raised = self._is_finger_raised(lms, MIDDLE_TIP, MIDDLE_PIP)
+        # Check if fingers are together (primary requirement)
         fingers_together = self._fingers_together(lms)
         
-        # If both fingers are raised AND together, track their movement for scrolling
-        if index_raised and middle_raised and fingers_together:
+        # Check if index and middle fingers are extended
+        index_raised = self._is_finger_raised(lms, INDEX_TIP, INDEX_PIP)
+        middle_raised = self._is_finger_raised(lms, MIDDLE_TIP, MIDDLE_PIP)
+        
+        # Check that ring and pinky are NOT extended (critical to distinguish from swipe)
+        # Ring and pinky should be below their PIP joints (not extended)
+        # Use stricter check: tips should be at or below PIP joints
+        ring_not_extended = lms[RING_TIP].y >= lms[RING_PIP].y
+        pinky_not_extended = lms[PINKY_TIP].y >= lms[PINKY_PIP].y
+        
+        # Scroll requires: 
+        # - Index AND middle together and raised (both must be raised)
+        # - Ring AND pinky NOT extended (both must be down)
+        # This ensures exactly 2 fingers, not 4
+        exactly_two_fingers = (index_raised and middle_raised and 
+                             ring_not_extended and pinky_not_extended)
+        
+        if fingers_together and exactly_two_fingers:
             current_y = self._get_average_y(lms)
             
             if self._last_y_position is not None:
@@ -73,17 +89,18 @@ class ScrollDetector:
                 # Emit scroll for any movement to ensure smooth, continuous scrolling
                 if abs(delta_y) > self.min_scroll_delta:
                     # delta_y: positive = moved down, negative = moved up
-                    # scroll_amount: positive = scroll down, negative = scroll up
-                    scroll_amount = delta_y * self.scroll_sensitivity
-                    # Filter out very small movements to avoid noise
-                    if abs(scroll_amount) > 0.5:
+                    # In pynput: positive dy scrolls UP, negative dy scrolls DOWN
+                    # So we invert: when fingers move up (negative delta_y), we want positive scroll (scroll up)
+                    scroll_amount = -delta_y * self.scroll_sensitivity
+                    # Filter out very small movements to avoid noise (lowered threshold)
+                    if abs(scroll_amount) > 0.3:
                         events.append(("SCROLL", scroll_amount))
             
             # Update position for next frame
             self._last_y_position = current_y
             self._is_scrolling = True
         else:
-            # Reset when both fingers are no longer raised or not together
+            # Reset when fingers are no longer together
             self._last_y_position = None
             self._is_scrolling = False
 
