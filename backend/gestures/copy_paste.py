@@ -1,7 +1,23 @@
+# copy_paste_gestures.py
+#
+# Gesture-based COPY / PASTE detector using MediaPipe hand landmarks.
+#
+# Gestures:
+#   COPY  -> 🤌 All five fingertips bundled tightly together (hold 1s)
+#   PASTE -> ✋ All five fingers extended and spread apart (hold 1s)
+#
+# This module DOES NOT touch networking.
+# It triggers callbacks:
+#   on_copy()
+#   on_paste()
+#
+# Usage:
+#   handler = CopyPasteGestureHandler(on_copy=..., on_paste=...)
+#   handler.process_landmarks(hand_landmarks)
+
 import time
 import math
-from typing import Optional
-import pyautogui
+from typing import Optional, Callable
 
 # MediaPipe landmark indices
 WRIST = 0
@@ -26,19 +42,34 @@ def dist(a, b):
 
 class CopyPasteGestureHandler:
     """
-    Gestures:
-      COPY  -> 🤌 all five fingertips bundled together (hold 1s)
-      PASTE -> ✋ all five fingers extended and widely spread (hold 1s)
+    Detects COPY / PASTE gestures and triggers callbacks.
+
+    COPY:
+      - All five fingertips tightly bundled together
+      - Hold for HOLD_DURATION seconds
+
+    PASTE:
+      - All fingers extended AND spread apart
+      - Hold for HOLD_DURATION seconds
     """
 
-    HOLD_DURATION = 1.0          # seconds
-    OPEN_THRESHOLD = 0.30        # openness for spread hand
-    SPREAD_MIN_DIST = 0.08       # min distance between adjacent fingertips
-    BUNDLE_RADIUS = 0.05         # max radius for fingertip bundle
+    HOLD_DURATION = 1.0      # seconds gesture must be held
+    OPEN_THRESHOLD = 0.30    # hand openness for paste
+    SPREAD_MIN_DIST = 0.08   # min distance between adjacent fingertips
+    BUNDLE_RADIUS = 0.05     # max radius for fingertip bundle
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        on_copy: Optional[Callable[[], None]] = None,
+        on_paste: Optional[Callable[[], None]] = None,
+    ) -> None:
+        self.on_copy = on_copy
+        self.on_paste = on_paste
+
         self._active_gesture: Optional[str] = None
         self._gesture_start_time: Optional[float] = None
+
+        print("COPY/PASTE GESTURE HANDLER INITIALIZED")
 
     # ---------- Public API ----------
 
@@ -49,6 +80,8 @@ class CopyPasteGestureHandler:
         if gesture != self._active_gesture:
             self._active_gesture = gesture
             self._gesture_start_time = time.time() if gesture else None
+            if gesture:
+                print(f"GESTURE STARTED: {gesture.upper()}")
             return
 
         # Same gesture held
@@ -86,7 +119,7 @@ class CopyPasteGestureHandler:
     def _are_fingertips_bundled(self, hand_landmarks) -> bool:
         """
         COPY gesture:
-        All five fingertips are close together in space.
+        All five fingertips are close together in 3D space.
         """
         lms = hand_landmarks.landmark
         tips = [lms[i] for i in
@@ -97,7 +130,6 @@ class CopyPasteGestureHandler:
         cy = sum(t.y for t in tips) / len(tips)
         cz = sum(t.z for t in tips) / len(tips)
 
-        # All tips must be close to the center
         for t in tips:
             if math.sqrt(
                 (t.x - cx) ** 2 +
@@ -116,7 +148,7 @@ class CopyPasteGestureHandler:
         lms = hand_landmarks.landmark
         openness = self._hand_openness(hand_landmarks)
 
-        # All fingers extended (tips above PIP joints)
+        # All fingers extended (tip above PIP)
         extended = (
             lms[THUMB_TIP].y < lms[THUMB_IP].y and
             lms[INDEX_TIP].y < lms[INDEX_PIP].y and
@@ -139,11 +171,11 @@ class CopyPasteGestureHandler:
 
     def _trigger_action(self, gesture: str) -> None:
         if gesture == "copy":
-            pyautogui.hotkey("command", "c")
-            print("COPY triggered 🤌")
+            print("COPY GESTURE CONFIRMED 🤌")
+            if self.on_copy:
+                self.on_copy()
+
         elif gesture == "paste":
-            pyautogui.hotkey("command", "v")
-            print("PASTE triggered ✋")
-       
-
-
+            print("PASTE GESTURE CONFIRMED ✋")
+            if self.on_paste:
+                self.on_paste()
