@@ -86,15 +86,19 @@ def main():
     )
 
     # Start network bridge
-    uri = "wss://<your-repl>.replit.dev"
+    uri = "wss://c6696aad-54be-4a56-8d33-096dd3ccfbf5-00-j4ckoakwrx74.worf.replit.dev"
     session_id = "team1"
     name = "LaptopA"  # change per laptop
+
     net = NetBridge(uri, session_id, name)
-    asyncio.get_event_loop().create_task(net.run())
+
+    net_loop = asyncio.new_event_loop()
+    threading.Thread(target=net_loop.run_forever, daemon=True).start()
+    net_loop.call_soon_threadsafe(net_loop.create_task, net.run())
 
     copy_paste = CopyPasteGestureHandler(
-        on_copy=lambda: asyncio.get_event_loop().create_task(net.send_clipboard()),
-        on_paste=lambda: mouse.paste()  # or write_clipboard_text(...) then paste if needed
+        on_copy=lambda: net_loop.call_soon_threadsafe(net_loop.create_task, net.send_clipboard()),
+        on_paste=lambda: mouse.paste(),
     )
 
     try:
